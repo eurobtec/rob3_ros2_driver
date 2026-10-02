@@ -1,0 +1,10 @@
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+build/
+install/
+log/
+.git/
+rob3_driver/build/
+rob3_driver/install/
+rob3_driver/log/
