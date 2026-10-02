@@ -120,19 +120,32 @@ setpoints to the robot/sim. RViz shows the motion because the driver publishes
 > `cmd_vel`/`teleop_twist_keyboard` (those are for mobile bases). A keyboard jog
 > node is included: `rob3_jog_keyboard`.
 
-### All-in-one in the Lyrical Docker image (RViz over noVNC)
+### One-command self-contained demo (no hardware, no ucSim)
 
-From the repository root, in the `osrf/ros:lyrical-desktop` container (same
-setup as "Run RViz in Docker" above — Xvfb + x11vnc + novnc on port 6080),
-after `colcon build` and sourcing the install:
+The fastest way to *try* teleop. It starts a **fake ROB3 controller** (answers
+the protocol on a pty), the real driver, RViz over noVNC, and the keyboard jog
+node — so you press keys and watch the arm move, with nothing but Docker:
 
 ```bash
-# terminal/pane 1 — driver + robot_state_publisher + RViz, talking to the robot
-#   real robot:  device:=/dev/ttyUSB0
+docker run --rm -it -p 6080:6080 rob3-ros2:lyrical \
+  ros2 run rob3_driver teleop_demo.sh
+```
+
+Then open **http://localhost:6080/vnc.html?autoconnect=1&resize=remote** for
+RViz, and in the same terminal use the jog keys: `1`..`6` select the axis,
+`+`/`-` jog, `[`/`]` change the step, `q` quits.
+
+### Against the real robot or ucSim (RViz over noVNC)
+
+In the baked image (Xvfb + x11vnc + novnc on port 6080), two panes:
+
+```bash
+# pane 1 — driver + robot_state_publisher + RViz, talking to the robot
+#   real robot:  device:=/dev/ttyUSB0   (pass --device /dev/ttyUSB0 to docker run)
 #   ucSim:       first run scripts/sim_bringup.py, then device:=/dev/pts/N
 ros2 launch rob3_driver rob3.launch.py rviz:=true device:=/dev/ttyUSB0
 
-# terminal/pane 2 — keyboard teleop (publishes /joint_jog)
+# pane 2 — keyboard teleop (publishes /joint_jog)
 ros2 run rob3_driver rob3_jog_keyboard
 ```
 
