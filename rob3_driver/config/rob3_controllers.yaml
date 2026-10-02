@@ -6,10 +6,10 @@
 
 rob3_driver:
   ros__parameters:
-    # transport: 'tcp' (ucSim -S socket) or 'serial' (real /dev/ttyUSB0)
-    transport: tcp
-    host: 127.0.0.1
-    port: 54321
+    # Only the serial transport is supported. For the real robot this is a
+    # USB-serial adapter; for ucSim it is the pty ucSim is attached to with
+    # `-S in=<dev>,out=<dev>` (see docs/SIMULATION.md).
+    transport: serial
     device: /dev/ttyUSB0
     baud: 9600
     publish_rate: 10.0     # /joint_states Hz

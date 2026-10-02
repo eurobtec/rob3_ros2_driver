@@ -8,12 +8,12 @@ Responsibilities over RS-232:
         read_serial_number  (std_srvs/Trigger)
 
 Parameters:
-  transport   : 'serial' | 'tcp'                 (default 'tcp')
-  device      : serial device                    (default '/dev/ttyUSB0')
-  baud        : serial baud                       (default 9600)
-  host, port  : TCP endpoint for ucSim -S socket  (default 127.0.0.1:54321)
-  publish_rate: /joint_states rate in Hz          (default 10.0)
-  joint_prefix: prefix for joint names            (default '')
+  transport   : 'serial'                          (default 'serial')
+  device      : serial device                     (default '/dev/ttyUSB0';
+                for ucSim, the pty ucSim is attached to — see docs/SIMULATION.md)
+  baud        : serial baud                        (default 9600)
+  publish_rate: /joint_states rate in Hz           (default 10.0)
+  joint_prefix: prefix for joint names             (default '')
 
 This node degrades gracefully if the transport can't be opened: it logs the
 error and keeps the action/service servers up (so `ros2` graph inspection and
@@ -45,11 +45,9 @@ class Rob3DriverNode(Node):
         super().__init__("rob3_driver")
 
         # --- parameters ------------------------------------------------------
-        self.declare_parameter("transport", "tcp")
+        self.declare_parameter("transport", "serial")
         self.declare_parameter("device", "/dev/ttyUSB0")
         self.declare_parameter("baud", 9600)
-        self.declare_parameter("host", "127.0.0.1")
-        self.declare_parameter("port", 54321)
         self.declare_parameter("publish_rate", 10.0)
         self.declare_parameter("joint_prefix", "")
 
@@ -66,8 +64,6 @@ class Rob3DriverNode(Node):
             self.transport_kind,
             device=p("device").value,
             baud=p("baud").value,
-            host=p("host").value,
-            port=p("port").value,
         )
         self.client = Rob3Client(transport=transport)
         self._connected = False

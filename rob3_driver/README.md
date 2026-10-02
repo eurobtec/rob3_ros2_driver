@@ -21,7 +21,7 @@ rob3_driver/
 ├── resource/rob3_driver
 ├── rob3_driver/
 │   ├── protocol.py           # pure ROB3 wire-protocol codec (no ROS deps)
-│   ├── transport.py          # serial + TCP-socket transports (real HW / ucSim -S)
+│   ├── transport.py          # serial transport (real HW and ucSim pty)
 │   ├── calibration.py        # joint <-> 0..255 count mapping (per-axis)
 │   ├── rob3_interface.py     # protocol + transport = high-level robot client
 │   └── rob3_driver_node.py   # ROS 2 node: JointState, trajectory action, services
@@ -36,7 +36,7 @@ rob3_driver/
 | Component | Responsibility |
 | :-------- | :-------------- |
 | `protocol.py` | Encode ROB3 commands and decode controller replies |
-| `transport.py` | Communicate over serial hardware or the ucSim TCP socket |
+| `transport.py` | Communicate over serial (the real robot, or a ucSim pty) |
 | `rob3_interface.py` | Provide a high-level client for the ROB3 protocol |
 | `rob3_driver_node.py` | Publish joint states and provide trajectory/action services |
 | `launch/`, `config/`, `urdf/` | Describe and configure the ROB3 ROS 2 system |
@@ -98,19 +98,26 @@ In the Codespaces **Ports** view, open port `6080` in a browser and visit
 Ctrl+C. To connect the driver to ucSim or hardware instead, omit
 `driver:=false` and provide the appropriate transport arguments.
 
-## Quickstart (against the simulator)
+## Quickstart
 
 ```bash
-# 1) build a ucSim with a serial socket and load the ROB3 ROM
-#    (the ROM + simulator live in the ROB3 firmware repo, under simulator/)
-ucsim_51 -t 51 -X 11.0592M -S port=54321 /path/to/rob3/simulator/build/rob3.hex
-
-# 2) run the driver pointed at that socket
-ros2 launch rob3_driver rob3.launch.py transport:=tcp host:=127.0.0.1 port:=54321
-
-# real hardware instead:
-ros2 launch rob3_driver rob3.launch.py transport:=serial device:=/dev/ttyUSB0
+# real robot: point the driver at the USB-serial adapter
+ros2 launch rob3_driver rob3.launch.py device:=/dev/ttyUSB0
 ```
+
+Against the **ucSim simulator** the driver uses the *same* serial transport —
+ucSim is attached to a pty and the driver opens the other end. The sim needs an
+auto-baud bring-up first (load the cl_hw modules, lock the baud with `rxd`); the
+step-by-step is in [docs/SIMULATION.md](docs/SIMULATION.md):
+
+```bash
+# after bringing ucSim up on a pty (see docs/SIMULATION.md), e.g. /dev/pts/7:
+ros2 launch rob3_driver rob3.launch.py device:=/dev/pts/7
+```
+
+> A TCP transport to ucSim's `-S port=` socket was tried and removed: that
+> socket feeds ucSim's single-byte RX buffer asynchronously and drops frames.
+> The paced serial pty/file path round-trips cleanly and matches real hardware.
 
 See `rob3_driver/protocol.py` for the exact wire encoding; every command there
 is annotated with its ROM provenance.

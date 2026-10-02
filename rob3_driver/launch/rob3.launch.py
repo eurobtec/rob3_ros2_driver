@@ -1,8 +1,10 @@
 """Launch the ROB3 driver + robot_state_publisher.
 
 Usage:
-  ros2 launch rob3_driver rob3.launch.py transport:=tcp host:=127.0.0.1 port:=54321
-  ros2 launch rob3_driver rob3.launch.py transport:=serial device:=/dev/ttyUSB0
+  # real robot
+  ros2 launch rob3_driver rob3.launch.py device:=/dev/ttyUSB0
+  # ucSim: point `device` at the pty ucSim is attached to (see docs/SIMULATION.md)
+  ros2 launch rob3_driver rob3.launch.py device:=/dev/pts/7
 """
 import os
 
@@ -20,12 +22,11 @@ def generate_launch_description():
     pkg = "rob3_driver"
 
     args = [
-        DeclareLaunchArgument("transport", default_value="tcp",
-                              description="'tcp' (ucSim -S socket) or 'serial'"),
-        DeclareLaunchArgument("device", default_value="/dev/ttyUSB0"),
+        DeclareLaunchArgument("transport", default_value="serial",
+                              description="link transport (only 'serial')"),
+        DeclareLaunchArgument("device", default_value="/dev/ttyUSB0",
+                      description="serial device (real robot or ucSim pty)"),
         DeclareLaunchArgument("baud", default_value="9600"),
-        DeclareLaunchArgument("host", default_value="127.0.0.1"),
-        DeclareLaunchArgument("port", default_value="54321"),
         DeclareLaunchArgument("publish_rate", default_value="10.0"),
         DeclareLaunchArgument("joint_prefix", default_value=""),
         DeclareLaunchArgument("driver", default_value="true",
@@ -55,8 +56,6 @@ def generate_launch_description():
             "transport": LaunchConfiguration("transport"),
             "device": LaunchConfiguration("device"),
             "baud": LaunchConfiguration("baud"),
-            "host": LaunchConfiguration("host"),
-            "port": LaunchConfiguration("port"),
             "publish_rate": LaunchConfiguration("publish_rate"),
             "joint_prefix": LaunchConfiguration("joint_prefix"),
         }],

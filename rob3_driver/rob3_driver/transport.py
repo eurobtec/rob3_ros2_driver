@@ -1,22 +1,24 @@
-"""Transports for the ROB3 link: a real serial port and a TCP socket.
+"""Serial transport for the ROB3 link.
 
-The ROB3 controller uses RS-232. During development the same bytes can be sent
-to the ucSim simulator through its `-S port=<n>` UART socket, so this module
-offers two interchangeable transports behind one tiny interface:
+The ROB3 controller uses RS-232. The driver speaks the same bytes to the real
+robot (`/dev/ttyUSB0`) and to the ucSim simulator — in the simulator case ucSim
+is attached to a pty/file with `-S in=<dev>,out=<dev>` and the driver opens the
+other end as a serial device, so the code path is identical.
 
+Interface:
     open() / close() / write(bytes) / read(n, timeout) / read_until(term, timeout)
 
-- SerialTransport  : real /dev/ttyUSB0 via pyserial (9600 8N1 by default; the
-                     ROB3 firmware auto-bauds off the first 0x20).
-- TcpTransport     : localhost:<port> to ucSim's -S serial socket.
-
 No ROS dependencies here so the transport is unit-testable and reusable.
+
+Note on ucSim: a TCP-socket transport (`-S port=`) was tried and removed — that
+socket feeds ucSim's single-byte RX buffer asynchronously and drops frames. The
+paced serial file/pty path (`-S in=/out=`) is the one that round-trips cleanly;
+see docs/SIMULATION.md for the bring-up.
 """
 from __future__ import annotations
 
-import socket
 import time
-from typing import Optional, Protocol
+from typing import Protocol
 
 
 class Transport(Protocol):
@@ -28,9 +30,10 @@ class Transport(Protocol):
 
 
 class SerialTransport:
-    """Real RS-232 via pyserial. 9600 8N1, no flow control (see
-    hardware/host/README.md). pyserial is imported lazily so the package can be
-    built/tested without it."""
+    """RS-232 via pyserial. 9600 8N1, no flow control (the ROB3 firmware
+    auto-bauds off the first 0x20). Works against the real robot
+    (`/dev/ttyUSB0`) and against a ucSim-attached pty. pyserial is imported
+    lazily so the package can be built/tested without it."""
 
     def __init__(self, device: str = "/dev/ttyUSB0", baud: int = 9600):
         self.device = device
@@ -38,7 +41,7 @@ class SerialTransport:
         self._ser = None
 
     def open(self) -> None:
-        import serial  # lazy import; only needed for real HW
+        import serial  # lazy import; only needed to actually talk to a device
 
         self._ser = serial.Serial(
             port=self.device,
@@ -88,72 +91,12 @@ class SerialTransport:
         return bytes(out)
 
 
-class TcpTransport:
-    """ucSim `-S port=<n>` serial socket (or any TCP byte stream). Note: some
-    ucSim builds wrap the socket with a small amount of telnet/ANSI negotiation
-    on connect; callers that need pristine bytes should skip the leading
-    non-protocol bytes (the driver filters to defined status/ETX frames)."""
-
-    def __init__(self, host: str = "127.0.0.1", port: int = 54321):
-        self.host = host
-        self.port = port
-        self._sock: Optional[socket.socket] = None
-
-    def open(self) -> None:
-        self._sock = socket.create_connection((self.host, self.port), timeout=2.0)
-        self._sock.setblocking(False)
-
-    def close(self) -> None:
-        if self._sock is not None:
-            try:
-                self._sock.close()
-            finally:
-                self._sock = None
-
-    def write(self, data: bytes) -> None:
-        assert self._sock is not None, "transport not open"
-        self._sock.sendall(data)
-
-    def _recv_some(self) -> bytes:
-        assert self._sock is not None
-        try:
-            return self._sock.recv(256)
-        except (BlockingIOError, InterruptedError):
-            return b""
-
-    def read(self, n: int, timeout: float = 1.0) -> bytes:
-        out = bytearray()
-        deadline = time.monotonic() + timeout
-        while len(out) < n and time.monotonic() < deadline:
-            chunk = self._recv_some()
-            if chunk:
-                out.extend(chunk)
-            else:
-                time.sleep(0.002)
-        return bytes(out)
-
-    def read_until(self, term: int, timeout: float = 1.0, limit: int = 256) -> bytes:
-        out = bytearray()
-        deadline = time.monotonic() + timeout
-        while len(out) < limit and time.monotonic() < deadline:
-            chunk = self._recv_some()
-            if chunk:
-                for b in chunk:
-                    out.append(b)
-                    if b == term:
-                        return bytes(out)
-            else:
-                time.sleep(0.002)
-        return bytes(out)
-
-
-def make_transport(kind: str, **kw) -> Transport:
-    """Factory: kind in {'serial', 'tcp'}."""
+def make_transport(kind: str = "serial", **kw) -> Transport:
+    """Factory. Only 'serial' is supported (the real link and the ucSim pty)."""
     kind = kind.lower()
     if kind == "serial":
         return SerialTransport(device=kw.get("device", "/dev/ttyUSB0"),
                                baud=int(kw.get("baud", 9600)))
-    if kind == "tcp":
-        return TcpTransport(host=kw.get("host", "127.0.0.1"),
-                            port=int(kw.get("port", 54321)))
-    raise ValueError(f"unknown transport kind: {kind!r}")
+    raise ValueError(
+        f"unknown transport kind: {kind!r} (only 'serial' is supported)")
+
