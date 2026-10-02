@@ -32,6 +32,7 @@ from rclpy.node import Node
 
 from builtin_interfaces.msg import Duration as DurationMsg
 from control_msgs.action import FollowJointTrajectory
+from control_msgs.msg import JointJog
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
 
@@ -82,6 +83,14 @@ class Rob3DriverNode(Node):
             goal_callback=self._on_goal, cancel_callback=self._on_cancel,
             callback_group=cbg,
         )
+
+        # Jog interface for teleop: nudge named joints by a delta (rad or m for
+        # the gripper), or by a velocity * dt. Converts to counts and sends a
+        # full position setpoint. RViz reflects it via /joint_states.
+        self.declare_parameter("jog_dt", 0.1)  # s, used when only velocities given
+        self._jog_dt = float(self.get_parameter("jog_dt").value)
+        self.create_subscription(
+            JointJog, "joint_jog", self._on_jog, 10, callback_group=cbg)
 
         self.create_service(Trigger, "enable_motors", self._srv_enable, callback_group=cbg)
         self.create_service(Trigger, "disable_motors", self._srv_disable, callback_group=cbg)
@@ -173,6 +182,50 @@ class Rob3DriverNode(Node):
 
     def _on_cancel(self, goal_handle):
         return CancelResponse.ACCEPT
+
+    # -------------------------------------------------------------- jog (teleop)
+    def _on_jog(self, msg: JointJog):
+        """Apply a JointJog: for each named joint, add `displacement` (rad/m) or
+        `velocity * jog_dt` to the current setpoint, then send all 6 counts.
+
+        Jogs from the last commanded counts so repeated nudges accumulate.
+        """
+        if not self._ensure():
+            self.get_logger().warning("jog ignored: not connected")
+            return
+        names = list(msg.joint_names)
+        if not names:
+            return
+        disp = list(msg.displacements) if msg.displacements else []
+        vel = list(msg.velocities) if msg.velocities else []
+        dt = float(msg.duration) if msg.duration else self._jog_dt
+
+        counts = list(self._last_counts)
+        changed = False
+        for i, name in enumerate(names):
+            if name not in self.joint_names:
+                self.get_logger().warning(f"jog: unknown joint {name!r}")
+                continue
+            axis = self.joint_names.index(name)
+            delta = 0.0
+            if i < len(disp):
+                delta += disp[i]
+            if i < len(vel):
+                delta += vel[i] * dt
+            if delta == 0.0:
+                continue
+            current_val = self.cal.count_to_joint(axis, counts[axis])
+            counts[axis] = self.cal.joint_to_count(axis, current_val + delta)
+            changed = True
+
+        if not changed:
+            return
+        try:
+            self.client.set_all_positions(counts)
+            self._last_counts = counts
+        except Exception as e:
+            self.get_logger().warning(f"jog send failed: {e}")
+            self._connected = False
 
     def _execute_trajectory(self, goal_handle):
         """Stream each trajectory point as a set of per-axis position setpoints,

@@ -28,6 +28,7 @@ setup(
     entry_points={
         "console_scripts": [
             "rob3_driver_node = rob3_driver.rob3_driver_node:main",
+            "rob3_jog_keyboard = rob3_driver.jog_keyboard:main",
         ],
     },
 )

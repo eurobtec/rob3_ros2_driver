@@ -43,8 +43,9 @@ rob3_driver/
 
 ## Build with Docker
 
-Run these commands from the repository root. The ROS 2 Lyrical desktop image
-provides the ROS environment and `colcon`:
+Run these commands from the **repository root** (`rob3_ros2_driver/`, the
+directory that contains the `rob3_driver/` package). The ROS 2 Lyrical desktop
+image provides the ROS environment and `colcon`:
 
 ```bash
 docker pull osrf/ros:lyrical-desktop
@@ -54,7 +55,7 @@ docker run --rm \
   -v "$PWD:/home/ubuntu" \
   -w /home/ubuntu \
   osrf/ros:lyrical-desktop \
-  bash -lc 'source /opt/ros/lyrical/setup.bash && colcon build --base-paths ros2'
+  bash -lc 'source /opt/ros/lyrical/setup.bash && colcon build'
 ```
 
 The build artifacts are written to `build/`, `install/`, and `log/` in the
@@ -80,7 +81,7 @@ apt-get update
 apt-get install -y xvfb x11vnc novnc ros-lyrical-xacro \
   ros-lyrical-robot-state-publisher ros-lyrical-joint-state-publisher
 source /opt/ros/lyrical/setup.bash
-colcon --log-base /tmp/rob3-log build --base-paths ros2 \
+colcon --log-base /tmp/rob3-log build \
   --build-base /tmp/rob3-build --install-base /tmp/rob3-install
 source /tmp/rob3-install/setup.bash
 xvfb-run -a -s "-screen 0 1400x900x24" bash -lc '
@@ -121,6 +122,59 @@ ros2 launch rob3_driver rob3.launch.py device:=/dev/pts/7
 
 See `rob3_driver/protocol.py` for the exact wire encoding; every command there
 is annotated with its ROM provenance.
+
+## Teleop (jog the arm) + RViz
+
+The driver subscribes to **`/joint_jog`** (`control_msgs/JointJog`): each
+message nudges the named joints and the driver sends the resulting position
+setpoints to the robot/sim. RViz shows the motion because the driver publishes
+**`/joint_states`**, which `robot_state_publisher` turns into TF for the URDF.
+
+> Note: this is a 6-axis arm, so teleop means **jogging joints**, not
+> `cmd_vel`/`teleop_twist_keyboard` (those are for mobile bases). A keyboard jog
+> node is included: `rob3_jog_keyboard`.
+
+### All-in-one in the Lyrical Docker image (RViz over noVNC)
+
+From the repository root, in the `osrf/ros:lyrical-desktop` container (same
+setup as "Run RViz in Docker" above — Xvfb + x11vnc + novnc on port 6080),
+after `colcon build` and sourcing the install:
+
+```bash
+# terminal/pane 1 — driver + robot_state_publisher + RViz, talking to the robot
+#   real robot:  device:=/dev/ttyUSB0
+#   ucSim:       first run scripts/sim_bringup.py, then device:=/dev/pts/N
+ros2 launch rob3_driver rob3.launch.py rviz:=true device:=/dev/ttyUSB0
+
+# terminal/pane 2 — keyboard teleop (publishes /joint_jog)
+ros2 run rob3_driver rob3_jog_keyboard
+```
+
+Keyboard jog keys: `1`..`6` select the axis (base, shoulder, elbow,
+wrist_pitch, wrist_roll, gripper); `+`/`-` jog it; `[`/`]` change the step size;
+`q` quits. Watch the arm move in RViz (open port `6080` →
+`/vnc.html?autoconnect=1&resize=remote`).
+
+### Jog from the command line (no keyboard node)
+
+```bash
+# nudge the base joint by +0.1 rad
+ros2 topic pub --once /joint_jog control_msgs/msg/JointJog \
+  '{joint_names: [base], displacements: [0.1]}'
+```
+
+### Scripted motion via the trajectory action
+
+```bash
+ros2 action send_goal /follow_joint_trajectory \
+  control_msgs/action/FollowJointTrajectory \
+  '{trajectory: {joint_names: [base, shoulder, elbow, wrist_pitch, wrist_roll, gripper],
+     points: [{positions: [0.2, 0.0, -0.3, 0.0, 0.0, 0.0],
+               time_from_start: {sec: 2}}]}}'
+```
+
+Services: `enable_motors`, `disable_motors`, `estop`, `read_serial_number`
+(`std_srvs/Trigger`), e.g. `ros2 service call /estop std_srvs/srv/Trigger`.
 
 ## Status / scope
 
