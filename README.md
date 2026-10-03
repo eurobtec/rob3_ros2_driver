@@ -37,6 +37,20 @@ pip install "rob3[serial] @ git+https://github.com/eurobtec/rob3_py.git"
 Its codec/calibration/client can be used and tested with plain `pytest` (no ROS
 install needed) — see that repo.
 
+## Docker
+
+The easiest way to run the driver (with RViz + teleop) is the baked image. It is
+**not** published to a registry, so you build it locally **first** from the
+[`Dockerfile`](Dockerfile) at the repo root:
+
+```bash
+docker build -t rob3-ros2:lyrical .     # build once; stays in your local image store
+docker images rob3-ros2                 # confirm the rob3-ros2:lyrical tag exists
+```
+
+All the `docker run ... rob3-ros2:lyrical` examples (see
+[`rob3_driver/README.md`](rob3_driver/README.md)) use this locally-built image.
+
 ## Relationship to the ROB3 firmware repo
 
 The driver's bytes are the reverse-engineered ROB3 low-level protocol,

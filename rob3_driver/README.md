@@ -61,12 +61,20 @@ run. Build it **once** from the repository root (the directory that contains the
 docker build -t rob3-ros2:lyrical .
 ```
 
+> **You must build this image first.** All the `docker run ... rob3-ros2:lyrical`
+> commands below (RViz, teleop demo, driver) use the local
+> `rob3-ros2:lyrical` image produced by the command above — it is **not** hosted
+> on a registry, so there is no `docker pull`. Build it once from the repository
+> root (where the [`Dockerfile`](../Dockerfile) lives) and the tag stays in your
+> local Docker image store (`docker images rob3-ros2`).
+
 > Why a baked image: the stock `osrf/ros:lyrical-desktop` ships a *frozen*
 > package set, but `control_msgs` from apt is newer and needs
 > `service_msgs`/`builtin_interfaces` upgraded in lockstep — otherwise you hit
 > `undefined symbol: has_buffer_fields_*` at runtime. The Dockerfile does one
 > coherent `apt upgrade` + installs `control_msgs`, `xacro`,
-> `joint_state_publisher`, `pyserial`, and the noVNC stack.
+> `joint_state_publisher`, `pyserial`, the `rob3` protocol library, and the
+> noVNC stack.
 
 The package is pre-built into `/opt/rob3_ws` and sourced automatically in every
 shell, so `ros2 run rob3_driver ...` and `ros2 launch rob3_driver ...` work out
