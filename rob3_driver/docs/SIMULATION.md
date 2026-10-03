@@ -20,17 +20,41 @@ UCSIM_51=/path/to/ucsim_51 \
 ros2 launch rob3_driver rob3.launch.py device:=/dev/pts/N
 ```
 
-## Why serial, not TCP
+## Live serial works now (the `check_often` ucSim fix)
 
-ucSim can expose its UART as a TCP socket (`-S port=`). We tried that and
-**removed** the TCP transport: that socket feeds ucSim's single-byte RX buffer
-asynchronously and **drops multi-byte frames** (a query's ETX is lost, so the
-firmware never dispatches and just idle-replies `0xF1`). See the ROB3 firmware
-repo `simulator/issues/004-async-serial-rx-dropped-or-garbled/`.
+Driving ucSim **live** over a serial pty/socket used to be unreliable: during a
+free `run`, ucSim polled the host serial fd only ~every 1.84M machine-cycles,
+which is **longer** than the firmware's ~1.47M-cycle RX timeout — so the two
+bytes of a command frame arrived on different polls and the firmware timed out
+between them, idle-replying `0xF1`. (Root cause + analysis: ROB3 firmware repo
+`simulator/issues/004-async-serial-rx-dropped-or-garbled/`.)
 
-The reliable path is ucSim's **serial file/pty** input, which is clocked at the
-modeled baud. The driver therefore uses `SerialTransport` for both the real
-robot (`/dev/ttyUSB0`) and the simulator (a pty).
+This is **fixed** by a one-line ucSim addition that exposes its existing
+per-UART `check_often` flag as a runtime command:
+
+```
+set hardware uart check_often 1
+```
+
+With it, ucSim drains the serial fd on **every** serial tick, so queued bytes
+are picked up well inside the firmware's timeout and live multi-byte frames
+dispatch. The patch lives in the firmware repo
+(`simulator/issues/004-*/fix-check_often-set_cmd.patch`); rebuild `ucsim_51`
+with it. `sim_bringup.py` enables the flag automatically.
+
+> This was never a real-hardware problem: at the locked baud two bytes are ~ms
+> apart on the wire, 50x inside the firmware's generous timeout (which exists to
+> recover from a host that stops mid-frame). It is purely a ucSim run-loop
+> polling artifact that only shows up on a live, async, multi-byte round-trip
+> under a free `run` — i.e. exactly what a hardware-style driver does.
+
+## Why serial (the driver uses one transport for robot + sim)
+
+The driver uses `SerialTransport` for both the real robot (`/dev/ttyUSB0`) and
+the simulator (a pty), so there is no sim-specific code path. ucSim can also
+expose its UART as a TCP socket (`-S port=`); with the `check_often` fix the
+socket round-trips too, but the pty path is what `sim_bringup.py` sets up because
+it lets the driver open it as a plain serial device.
 
 ## The auto-baud bring-up (why a plain launch isn't enough)
 
@@ -44,25 +68,29 @@ this choreography for you:
 1. create a pty pair; attach ucSim's UART to it (`-S in=<pty>,out=<pty>,raw`);
 2. `loadhw adc.so`, `loadhw rxd.so`;
 3. run to the auto-baud pin-poll (`0x06BF`), `set hardware rxd 0x20 128` to lock;
-4. free-run the ROM;
-5. print the pty device path.
+4. `set hardware uart check_often 1` (the live-serial fix);
+5. free-run the ROM;
+6. print the pty device path.
 
-## Reliability caveat
+## Verification
 
-Live *interactive* RX over the pty is **not fully reliable** in ucSim 0.9.9:
-asynchronously-arriving bytes can misalign with the UART bit clock and corrupt a
-frame (`simulator/issues/004`). For **deterministic verification**, use the
-driver's integration test, which drives the exact same protocol bytes through
-ucSim's pre-staged `-S in=<file>` path (baud-paced, reliable):
+Two integration tests cover the sim path:
 
 ```bash
+# (a) deterministic protocol round-trip over the pre-staged file path
+#     (works with stock ucSim; no check_often needed)
 UCSIM_51=/path/to/ucsim_51 \
   python3 -m pytest rob3_driver/test/test_sim_roundtrip.py
+
+# (b) LIVE teleop: control_msgs/JointJog -> driver -> firmware in free-running
+#     ucSim, over a live pty (needs the check_often-enabled ucsim_51)
+#     Run inside the rob3-ros2 image; see test/test_teleop_ucsim.py header.
+python3 rob3_driver/test/test_teleop_ucsim.py
 ```
 
-That test brings the ROM up, sends the all-axis position query, and asserts the
-firmware dispatches and returns a well-formed reply frame that the driver's
-codec parses.
+Test (b) brings the ROM up, connects the real driver node, publishes a JointJog
+on an axis, and asserts the jog reaches the firmware (calibrated count + ACK)
+over the live link — the end-to-end teleop proof enabled by the fix.
 
 ## Environment variables
 

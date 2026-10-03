@@ -3,8 +3,10 @@
 Brings the ROB3 ROM up in ucSim to the serial auto-baud lock (via the `rxd`
 cl_hw module), then exchanges the driver's own encoded command frames over
 ucSim's **pre-staged file** serial path (`-S in=<file>,out=<file>`) — the
-reliable, baud-paced path (see simulator/issues/004 for why the socket/pty
-paths are not used). Asserts the firmware dispatches the frame and replies with
+deterministic, baud-paced path (the live pty/socket paths also work once ucSim's
+`check_often` flag is enabled; see simulator/issues/004 and
+test/test_teleop_ucsim.py for the live round-trip). Asserts the firmware
+dispatches the frame and replies with
 a well-formed frame that the driver's codec parses.
 
 Skips cleanly without a loader-enabled ucsim_51 + the adc/rxd modules + the ROM.

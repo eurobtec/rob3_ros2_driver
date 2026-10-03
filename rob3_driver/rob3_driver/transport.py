@@ -10,10 +10,13 @@ Interface:
 
 No ROS dependencies here so the transport is unit-testable and reusable.
 
-Note on ucSim: a TCP-socket transport (`-S port=`) was tried and removed — that
-socket feeds ucSim's single-byte RX buffer asynchronously and drops frames. The
-paced serial file/pty path (`-S in=/out=`) is the one that round-trips cleanly;
-see docs/SIMULATION.md for the bring-up.
+Note on ucSim: a TCP-socket transport (`-S port=`) was tried and removed. The
+problem was NOT the UART — it was ucSim polling the host serial fd too rarely
+during a free `run`, so multi-byte frames timed out mid-frame (ROB3 firmware
+repo `simulator/issues/004`). That is fixed by enabling ucSim's `check_often`
+flag (`set hardware uart check_often 1`), after which both the pty and socket
+paths round-trip live. The driver keeps a single `SerialTransport` for the real
+robot (`/dev/ttyUSB0`) and the sim (a pty); see docs/SIMULATION.md.
 """
 from __future__ import annotations
 

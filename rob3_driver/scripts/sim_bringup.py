@@ -15,18 +15,18 @@ Then point the driver at the printed device:
 
     ros2 launch rob3_driver rob3.launch.py device:=/dev/pts/N
 
-Why a PTY and not ucSim's `-S port=` TCP socket: that socket feeds ucSim's
-single-byte RX buffer asynchronously and drops multi-byte frames. The PTY/file
-path is clocked at the modeled baud and round-trips cleanly, and it lets the
-driver use the exact same SerialTransport it uses for the real robot.
+Why a PTY (vs ucSim's `-S port=` TCP socket): either works once ucSim's
+`check_often` flag is on; this helper uses a pty so the driver opens it as a
+plain serial device, exactly like the real robot.
 
-CAVEAT (see simulator/issues/004 in the ROB3 firmware repo): live *interactive*
-RX over a pty is not fully reliable in ucSim 0.9.9 — asynchronously-arriving
-bytes can misalign with the UART bit clock and corrupt a frame. The *reliable*
-ucSim serial contract is the pre-staged `-S in=<file>` path, which the driver's
-integration test (test/test_sim_roundtrip.py) uses. This helper is a best-effort
-convenience for interactive poking; for deterministic verification use that
-test. The limitation is a ucSim UART-model issue, not a driver bug.
+NOTE (ROB3 firmware repo simulator/issues/004): live serial over a pty/socket
+used to lose frames because ucSim polled the host fd too rarely during a free
+`run` (longer than the firmware's RX timeout). This helper now enables ucSim's
+`check_often` flag after lock (`set hardware uart check_often 1`), which drains
+the fd every serial tick and makes live multi-byte round-trips reliable. It was
+never a real-hardware issue (the firmware timeout is ~50x the on-wire byte gap).
+A fully deterministic alternative remains the pre-staged `-S in=<file>` path
+used by test/test_sim_roundtrip.py.
 
 Env:
   UCSIM_51   path to a loader-enabled ucsim_51 (default: the local build)
@@ -111,6 +111,9 @@ def main():
     out = _cmd(cfd, "step 60000", timeout=15.0)
     locked = "0x00073c" in out
     _cmd(cfd, "clear")
+    # Enable live-serial fd draining (issue-004 fix). Harmless if the ucsim_51
+    # build predates it (the command is simply rejected).
+    _cmd(cfd, "set hardware uart check_often 1")
     os.write(cfd, b"run\n")  # free-run; UART now live
 
     print(f"ucSim up (pid {pid}); auto-baud {'LOCKED' if locked else 'NOT locked'}")

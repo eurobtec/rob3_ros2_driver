@@ -102,9 +102,13 @@ step-by-step is in [docs/SIMULATION.md](docs/SIMULATION.md):
 ros2 launch rob3_driver rob3.launch.py device:=/dev/pts/7
 ```
 
-> A TCP transport to ucSim's `-S port=` socket was tried and removed: that
-> socket feeds ucSim's single-byte RX buffer asynchronously and drops frames.
-> The paced serial pty/file path round-trips cleanly and matches real hardware.
+> Live serial to ucSim (pty or `-S port=` socket) works once ucSim's
+> `check_often` flag is enabled (`set hardware uart check_often 1`); without it,
+> ucSim polled the host fd too rarely during a free `run` and multi-byte frames
+> timed out mid-frame (ROB3 firmware repo `simulator/issues/004` — a ucSim
+> run-loop artifact, never a real-hardware problem). `sim_bringup.py` enables it
+> automatically. The driver keeps one `SerialTransport` for both the robot and
+> the sim pty.
 
 See `rob3_driver/protocol.py` for the exact wire encoding; every command there
 is annotated with its ROM provenance.
