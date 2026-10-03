@@ -21,6 +21,11 @@
   <exec_depend>joint_state_publisher</exec_depend>
   <exec_depend>xacro</exec_depend>
   <exec_depend>rviz2</exec_depend>
+  <!-- The ROS-independent protocol/transport/calibration/client core lives in
+       the standalone `rob3` library (https://github.com/eurobtec/rob3_py). It is
+       a pip package, NOT a rosdep key, so it is installed via pip rather than
+       rosdep (the Dockerfile does this; or `pip install rob3`). It is listed in
+       setup.py `install_requires` so a pip/colcon build pulls it in. -->
   <!-- pyserial is only needed for real hardware (transport:=serial). It is a
        pip package; install with `pip install pyserial` or rosdep 'python3-serial'. -->
   <exec_depend>python3-serial</exec_depend>

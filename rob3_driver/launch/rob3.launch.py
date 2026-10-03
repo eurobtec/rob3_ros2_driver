@@ -3,7 +3,7 @@
 Usage:
   # real robot
   ros2 launch rob3_driver rob3.launch.py device:=/dev/ttyUSB0
-  # ucSim: point `device` at the pty ucSim is attached to (see docs/SIMULATION.md)
+  # ucSim: point `device` at the pty ucSim is attached to (see the rob3 library's docs/SIMULATION.md)
   ros2 launch rob3_driver rob3.launch.py device:=/dev/pts/7
 """
 import os

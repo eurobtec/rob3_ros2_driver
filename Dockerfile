@@ -32,6 +32,13 @@ RUN apt-get update \
 # Build the driver into a workspace layer.
 WORKDIR /opt/rob3_ws/src/rob3_driver
 COPY rob3_driver/ ./
+
+# The ROS-independent protocol/transport/calibration/client core lives in the
+# standalone `rob3` library (https://github.com/eurobtec/rob3_py). Install it
+# (with pyserial for the real-HW transport) before building the ament package.
+RUN pip install --no-cache-dir --break-system-packages \
+      "rob3[serial] @ git+https://github.com/eurobtec/rob3_py.git"
+
 WORKDIR /opt/rob3_ws
 RUN source /opt/ros/lyrical/setup.bash \
  && colcon build

@@ -231,7 +231,7 @@ def main():
     import rclpy.executors
     from control_msgs.msg import JointJog
     from rob3_driver.rob3_driver_node import Rob3DriverNode  # the real node
-    from rob3_driver.calibration import Calibration
+    from rob3 import Calibration
 
     sim = UcSim(rom, link_sim)
     fail = 0

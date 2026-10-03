@@ -20,7 +20,7 @@ setup(
         # install the demo shell script where `ros2 run` can find+exec it
         (os.path.join("lib", package_name), glob("scripts/*.sh")),
     ],
-    install_requires=["setuptools"],
+    install_requires=["setuptools", "rob3"],
     zip_safe=True,
     maintainer="ROB3 project",
     maintainer_email="dev@example.com",
@@ -31,7 +31,7 @@ setup(
         "console_scripts": [
             "rob3_driver_node = rob3_driver.rob3_driver_node:main",
             "rob3_jog_keyboard = rob3_driver.jog_keyboard:main",
-            "rob3_fake_robot = rob3_driver.fake_robot:main",
+            "rob3_fake_robot = rob3.fake_robot:main",
         ],
     },
 )

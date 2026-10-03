@@ -8,7 +8,7 @@ rob3_driver:
   ros__parameters:
     # Only the serial transport is supported. For the real robot this is a
     # USB-serial adapter; for ucSim it is the pty ucSim is attached to with
-    # `-S in=<dev>,out=<dev>` (see docs/SIMULATION.md).
+    # `-S in=<dev>,out=<dev>` (see the rob3 library's docs/SIMULATION.md).
     transport: serial
     device: /dev/ttyUSB0
     baud: 9600

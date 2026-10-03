@@ -21,31 +21,33 @@ Drop the package into a ROS 2 workspace and build:
 ```bash
 mkdir -p ~/ros2_ws/src && cd ~/ros2_ws/src
 ln -s /path/to/rob3_ros2_driver/rob3_driver .
+# the driver depends on the standalone rob3 library:
+pip install "rob3[serial] @ git+https://github.com/eurobtec/rob3_py.git"
 cd ~/ros2_ws && colcon build --packages-select rob3_driver
 ```
 
-The protocol codec, transports, and calibration are **ROS-independent** and can
-be used / tested with plain `pytest` (no ROS install needed):
+The protocol codec, transports, and calibration are **ROS-independent** and now
+live in the standalone [`rob3`](https://github.com/eurobtec/rob3_py) library.
+Install it (the driver depends on it):
 
 ```bash
-cd rob3_driver && python3 -m pytest test/test_protocol.py test/test_calibration.py test/test_client_fake.py
+pip install "rob3[serial] @ git+https://github.com/eurobtec/rob3_py.git"
 ```
+
+Its codec/calibration/client can be used and tested with plain `pytest` (no ROS
+install needed) — see that repo.
 
 ## Relationship to the ROB3 firmware repo
 
-This driver is standalone, but one integration test cross-checks the driver's
-encoded bytes against the **real ROM** running in ucSim:
-`rob3_driver/test/test_driver_protocol_vs_rom.sh`. That test needs the ROB3
-firmware repo (for the ROM image) and a ucSim binary; it takes the ROM via the
-`SAFEHEX` environment variable, e.g.:
-
-```bash
-SAFEHEX=/path/to/rob3/simulator/build/rob3.hex SIM=ucsim_51 \
-  rob3_driver/test/test_driver_protocol_vs_rom.sh
-```
+The driver's bytes are the reverse-engineered ROB3 low-level protocol,
+cross-checked against the **real ROM** running in ucSim. That verification
+(the codec-vs-ROM check and the ucSim round-trip) lives with the protocol code
+in the [`rob3`](https://github.com/eurobtec/rob3_py) library repo, which needs
+the ROB3 firmware repo (for the ROM image) and a ucSim binary.
 
 The protocol/firmware documentation (`hardware/host/command.md`,
-`firmware/src/annotated/`) also lives in that firmware repo.
+`firmware/src/annotated/`) lives in the firmware repo
+[eurobtec/rob3](https://github.com/eurobtec/rob3).
 
 ## License
 

@@ -12,6 +12,11 @@ speaks the same bytes to either **real hardware** (`/dev/ttyUSB0`) or the
 **ucSim simulator** (via its `-S` UART socket), so it can be developed without
 the robot.
 
+The ROS-independent core — the protocol codec, serial transport, joint↔count
+calibration, and high-level client — lives in the standalone
+[**`rob3`** library](https://github.com/eurobtec/rob3_py)
+(`pip install rob3`). This package is the thin ROS 2 layer on top of it.
+
 ## Layout
 
 ```
@@ -20,26 +25,30 @@ rob3_driver/
 ├── setup.py / setup.cfg
 ├── resource/rob3_driver
 ├── rob3_driver/
-│   ├── protocol.py           # pure ROB3 wire-protocol codec (no ROS deps)
-│   ├── transport.py          # serial transport (real HW and ucSim pty)
-│   ├── calibration.py        # joint <-> 0..255 count mapping (per-axis)
-│   ├── rob3_interface.py     # protocol + transport = high-level robot client
-│   └── rob3_driver_node.py   # ROS 2 node: JointState, trajectory action, services
+│   ├── rob3_driver_node.py   # ROS 2 node: JointState, trajectory action, services
+│   └── jog_keyboard.py       # keyboard teleop -> control_msgs/JointJog
 ├── launch/rob3.launch.py
 ├── config/rob3_controllers.yaml
 ├── urdf/rob3.urdf.xacro
-└── test/                     # pytest unit tests (protocol codec, calibration)
+└── test/                     # ROS teleop integration test (ucSim)
+
+# the protocol/transport/calibration/client core is the `rob3` pip package:
+#   rob3.protocol  rob3.transport  rob3.calibration  rob3.Rob3Client  rob3.fake_robot
 ```
 
 ## Architecture
 
 | Component | Responsibility |
 | :-------- | :-------------- |
-| `protocol.py` | Encode ROB3 commands and decode controller replies |
-| `transport.py` | Communicate over serial (the real robot, or a ucSim pty) |
-| `rob3_interface.py` | Provide a high-level client for the ROB3 protocol |
-| `rob3_driver_node.py` | Publish joint states and provide trajectory/action services |
+| `rob3` (pip library) | Wire-protocol codec, serial transport, calibration, `Rob3Client`, fake robot — all ROS-independent |
+| `rob3_driver_node.py` | Publish joint states and provide trajectory/action/jog/services, using a `rob3.Rob3Client` |
+| `jog_keyboard.py` | Keyboard teleop publishing `control_msgs/JointJog` |
 | `launch/`, `config/`, `urdf/` | Describe and configure the ROB3 ROS 2 system |
+
+The protocol/transport/calibration code and its unit tests, the ucSim bring-up
+helper (`sim_bringup.py`), the codec-vs-ROM check, and `docs/SIMULATION.md` now
+live in the `rob3` library repo. See
+[eurobtec/rob3_py](https://github.com/eurobtec/rob3_py).
 
 ## Build with Docker
 
@@ -95,10 +104,12 @@ ros2 launch rob3_driver rob3.launch.py device:=/dev/ttyUSB0
 Against the **ucSim simulator** the driver uses the *same* serial transport —
 ucSim is attached to a pty and the driver opens the other end. The sim needs an
 auto-baud bring-up first (load the cl_hw modules, lock the baud with `rxd`); the
-step-by-step is in [docs/SIMULATION.md](docs/SIMULATION.md):
+step-by-step, the `sim_bringup.py` helper, and the full simulation guide live in
+the `rob3` library repo
+([docs/SIMULATION.md](https://github.com/eurobtec/rob3_py/blob/master/docs/SIMULATION.md)):
 
 ```bash
-# after bringing ucSim up on a pty (see docs/SIMULATION.md), e.g. /dev/pts/7:
+# after bringing ucSim up on a pty (rob3_py scripts/sim_bringup.py), e.g. /dev/pts/7:
 ros2 launch rob3_driver rob3.launch.py device:=/dev/pts/7
 ```
 
@@ -110,8 +121,8 @@ ros2 launch rob3_driver rob3.launch.py device:=/dev/pts/7
 > automatically. The driver keeps one `SerialTransport` for both the robot and
 > the sim pty.
 
-See `rob3_driver/protocol.py` for the exact wire encoding; every command there
-is annotated with its ROM provenance.
+See the `rob3` library's `protocol.py` for the exact wire encoding; every
+command there is annotated with its ROM provenance.
 
 ## Teleop (jog the arm) + RViz
 
@@ -189,4 +200,4 @@ Services: `enable_motors`, `disable_motors`, `estop`, `read_serial_number`
   setpoints by default.
 - Joint↔count calibration uses the per-axis bench values from the ROB3 firmware
   repo (`hardware/motors/`) where available; unmeasured axes use a linear
-  placeholder clearly marked in `calibration.py`.
+  placeholder clearly marked in the `rob3` library's `calibration.py`.

@@ -10,7 +10,8 @@ Responsibilities over RS-232:
 Parameters:
   transport   : 'serial'                          (default 'serial')
   device      : serial device                     (default '/dev/ttyUSB0';
-                for ucSim, the pty ucSim is attached to — see docs/SIMULATION.md)
+                for ucSim, the pty ucSim is attached to — see the rob3 library's
+                docs/SIMULATION.md)
   baud        : serial baud                        (default 9600)
   publish_rate: /joint_states rate in Hz           (default 10.0)
   joint_prefix: prefix for joint names             (default '')
@@ -36,9 +37,7 @@ from control_msgs.msg import JointJog
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Trigger
 
-from .calibration import Calibration
-from .rob3_interface import Rob3Client
-from .transport import make_transport
+from rob3 import Calibration, Rob3Client, make_transport
 
 
 class Rob3DriverNode(Node):
