@@ -25,7 +25,9 @@ RUN apt-get update \
       ros-lyrical-xacro \
       ros-lyrical-robot-state-publisher \
       ros-lyrical-joint-state-publisher \
+      python3-pip \
       python3-serial \
+      git \
       xvfb x11vnc novnc websockify \
  && rm -rf /var/lib/apt/lists/*
 
@@ -36,7 +38,7 @@ COPY rob3_driver/ ./
 # The ROS-independent protocol/transport/calibration/client core lives in the
 # standalone `rob3` library (https://github.com/eurobtec/rob3_py). Install it
 # (with pyserial for the real-HW transport) before building the ament package.
-RUN pip install --no-cache-dir --break-system-packages \
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
       "rob3[serial] @ git+https://github.com/eurobtec/rob3_py.git"
 
 WORKDIR /opt/rob3_ws
